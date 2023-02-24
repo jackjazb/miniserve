@@ -3,7 +3,7 @@ use crate::md_parser::parse_md;
 pub mod md_parser;
 
 use std::{
-    error, fmt, fs,
+    error, fs,
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
     path::PathBuf,
@@ -12,36 +12,29 @@ use std::{
 // override result type
 type Result<T> = std::result::Result<T, Box<dyn error::Error>>;
 
-#[derive(Debug)]
-struct ResponseError(String);
-
-impl fmt::Display for ResponseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "HTTP response error: {}", self.0)
-    }
-}
-
-struct TextResponse {
+struct HTTPResponse {
     status: String,
     headers: String,
-    body: String,
+    body: Vec<u8>,
 }
 
 trait FormatResponse {
     // return byte array - could be text but might want to extend to images in future
-    fn format_response(&self) -> Vec<u8>;
+    fn into_response(&mut self) -> Vec<u8>;
 }
 
-impl FormatResponse for TextResponse {
-    fn format_response(&self) -> Vec<u8> {
+impl FormatResponse for HTTPResponse {
+    fn into_response(&mut self) -> Vec<u8> {
         match self {
-            TextResponse {
+            HTTPResponse {
                 status,
                 headers,
                 body,
-            } => format!("{status}\r\n{headers}\r\n\r\n{body}")
-                .as_bytes()
-                .to_vec(),
+            } => {
+                let mut response = format!("{status}\r\n{headers}\r\n\r\n").as_bytes().to_vec();
+                response.append(body);
+                return response;
+            }
         }
     }
 }
@@ -83,10 +76,12 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
     let mut buf_reader = BufReader::new(&mut stream);
 
     // A response to send if the resource isn't found
-    let error_response = TextResponse {
+    let mut error_response = HTTPResponse {
         status: STATUS_NOT_FOUND.to_string(),
         headers: "".to_string(),
-        body: "404 // Requested resource not found".to_string(),
+        body: "404 // Requested resource not found"
+            .to_string()
+            .into_bytes(),
     };
 
     // Split the request into parts and get the requested resource
@@ -100,7 +95,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
 
     let response = match resolve_result {
         Ok(response) => response,
-        Err(_) => error_response.format_response(),
+        Err(_) => error_response.into_response(),
     };
 
     stream.write_all(&response)?;
@@ -117,7 +112,8 @@ fn resolve_response(requested_resource: &str) -> Result<Vec<u8>> {
 
     // TODO - If a file extension has been provided, load that resource if available
     if has_extension {
-        return Err("Resource not found".into());
+        let mut file_response = load_file_response(path)?;
+        return Ok(file_response.into_response());
     }
 
     // Automatically resolve the root to index
@@ -127,14 +123,14 @@ fn resolve_response(requested_resource: &str) -> Result<Vec<u8>> {
 
     path.set_extension("md");
 
-    let md_response = load_md_response(path)?;
-    Ok(md_response.format_response())
+    let mut md_response = load_md_response(path)?;
+    Ok(md_response.into_response())
 }
 
 /**
  * Loads and parses a markdown file relative to the server directory
  */
-fn load_md_response(path: PathBuf) -> Result<TextResponse> {
+fn load_md_response(path: PathBuf) -> Result<HTTPResponse> {
     let mut abs_path = PathBuf::from(SERVER_DIR);
     abs_path.push(path.strip_prefix("/")?.to_path_buf());
 
@@ -145,6 +141,7 @@ fn load_md_response(path: PathBuf) -> Result<TextResponse> {
     let html = format!(
         "
 	<head>
+		<title>{title}</title>
 		<style>
 			{GLOBAL_STYLE}
 		</style>
@@ -154,14 +151,46 @@ fn load_md_response(path: PathBuf) -> Result<TextResponse> {
 			{md_parse_result}
 		</div>
 	</body>
-	"
+	",
+        title = path.strip_prefix("/")?.display()
     );
     let length = html.len().to_string();
 
-    let response = TextResponse {
+    let response = HTTPResponse {
         status: STATUS_OK.to_string(),
         headers: format!("Content-Length: {length}"),
-        body: html,
+        body: html.into_bytes(),
+    };
+
+    return Ok(response);
+}
+
+fn load_file_response(path: PathBuf) -> Result<HTTPResponse> {
+    let extension = path.extension();
+
+    // Match different extensions for content type here
+    let header = match extension {
+        Some(os_str) => match os_str.to_str() {
+            Some("ico") => "Content-Type: image/*",
+            Some("png") => "Content-Type: image/png",
+            Some(&_) => "Content-Type: text/html",
+            None => "",
+        },
+        None => "",
+    };
+
+    let mut abs_path = PathBuf::from(SERVER_DIR);
+    abs_path.push(path.strip_prefix("/")?.to_path_buf());
+
+    println!("Requested {:#?}...", abs_path);
+
+    let read_result = fs::read(abs_path)?;
+    let length = read_result.len().to_string();
+
+    let response = HTTPResponse {
+        status: STATUS_OK.to_string(),
+        headers: format!("{header}\nContent-Length: {length}"),
+        body: read_result,
     };
 
     return Ok(response);
