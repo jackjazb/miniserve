@@ -1,6 +1,14 @@
+use std::str::Split;
+
 /**
 * A basic markdown parser. Tries to parse md into html, and returns unchanged text for any failed fragments.
 */
+#[derive(PartialEq)]
+enum Block {
+    Root,
+    Code,
+    List,
+}
 
 /**
  * Parses a full markdown file into HTML.
@@ -9,15 +17,12 @@ pub fn parse_md(markdown: String) -> String {
     // First split into paragraph 'blocks'
     let blocks = markdown.split("\n\n");
     let mut html = String::new();
-    html += "<body style=\"font-family: helvetica\">";
 
     for block in blocks {
         let parsed_block = parse_block(&block);
-
         html += &parsed_block;
     }
 
-    html += "</body>";
     return html;
 }
 
@@ -28,28 +33,54 @@ fn parse_block(block: &str) -> String {
     let fragments = block.split("\n");
 
     let mut parsed_block = String::new();
-    let mut in_code_block = false;
+
+    // Indicates which type of block is currently being rendered
+    let mut current_block: Block = Block::Root;
 
     for fragment in fragments {
+        // Don't try to parse an empty line
+        if fragment == "" {
+            continue;
+        }
+        // Upon encountering a "-", enter a list block. Stay in a list block until a line without a dash is encountered
+        if &fragment[..1] == "-" {
+            if current_block != Block::List {
+                parsed_block.push_str("<ul>");
+                current_block = Block::List;
+            }
+            let mut tokens = fragment.split(" ");
+            tokens.next();
+            let text = get_tail(tokens);
+            parsed_block.push_str(&format!("<li>{text}</li>"));
+            continue;
+        }
+
+        if current_block == Block::List {
+            parsed_block.push_str("</ul>");
+            current_block = Block::Root;
+        }
+
+        // Handle getting in and out of code blocks
         if fragment == "```" {
-            let tag = if in_code_block {
-                "</div>"
+            if current_block == Block::Code {
+                current_block = Block::Root;
+                parsed_block.push_str("</div>");
             } else {
-                "<div style=\"font-family:monospace\">"
+                current_block = Block::Code;
+                parsed_block.push_str("<div class=\"code\">");
             };
-            in_code_block = !in_code_block;
-            parsed_block.push_str(tag);
 
             continue;
         }
 
         // If we're in a code block, keep pushing lines until we get out of it
-        if in_code_block {
+        if current_block == Block::Code {
             parsed_block.push_str(fragment);
-
+            parsed_block.push_str("</br>");
             continue;
         }
 
+        // If we're not in a block, parse the line as a whole
         parsed_block.push_str(&parse_line(fragment));
     }
 
@@ -88,7 +119,7 @@ fn parse_header(line: &str) -> String {
     }
 
     // Fold remaining tokens back into a string
-    let title: String = token_split.fold(String::new(), |a, b| a + " " + b);
+    let title: String = get_tail(token_split);
 
     // Match all valid markdown headers - if nothing matches, return the unchanged line
     let header = match first {
@@ -99,4 +130,11 @@ fn parse_header(line: &str) -> String {
     };
 
     return header;
+}
+
+/**
+ * Utility function for getting text after a bit of markdown syntax
+ */
+fn get_tail(tokens: Split<&str>) -> String {
+    tokens.fold(String::new(), |a, b| a + " " + b)
 }

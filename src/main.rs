@@ -50,6 +50,22 @@ impl FormatResponse for TextResponse {
 const SERVER_DIR: &str = "/home/jack/rust/webserver/src/pub/";
 const STATUS_OK: &str = "HTTP/1.1 200 OK ";
 const STATUS_NOT_FOUND: &str = "HTTP/1.1 404 Not Found ";
+const GLOBAL_STYLE: &str = "
+	h1{
+		font-size: 2.5em;
+	}
+	body{
+		font-family:helvetica;
+	}
+	.container{
+		width: 50%;
+		margin: 40px auto;
+	}
+	.code{
+		white-space: pre;
+		tab-size: 30px;
+		font-family:monospace;
+	}";
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
@@ -64,7 +80,7 @@ fn main() {
 }
 
 fn handle_connection(mut stream: TcpStream) -> Result<()> {
-    let buf_reader = BufReader::new(&mut stream);
+    let mut buf_reader = BufReader::new(&mut stream);
 
     // A response to send if the resource isn't found
     let error_response = TextResponse {
@@ -74,7 +90,9 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
     };
 
     // Split the request into parts and get the requested resource
-    let request = buf_reader.lines().next().unwrap()?;
+    let mut request = String::new();
+    buf_reader.read_line(&mut request)?;
+
     let parts: Vec<_> = request.split(" ").collect();
     let resource = parts[1];
 
@@ -109,30 +127,41 @@ fn resolve_response(requested_resource: &str) -> Result<Vec<u8>> {
 
     path.set_extension("md");
 
-    let md_response = load_md(path)?;
+    let md_response = load_md_response(path)?;
     Ok(md_response.format_response())
 }
 
 /**
- * Loads a markdown file relative to the server directory
+ * Loads and parses a markdown file relative to the server directory
  */
-fn load_md(path: PathBuf) -> Result<TextResponse> {
+fn load_md_response(path: PathBuf) -> Result<TextResponse> {
     let mut abs_path = PathBuf::from(SERVER_DIR);
     abs_path.push(path.strip_prefix("/")?.to_path_buf());
 
-    println!("Loading {:#?}...", abs_path);
-
-    //let file = File::open(&abs_path)?;
-    //let reader = BufReader::new(file);
+    println!("Requested {:#?}...", abs_path);
 
     let read_result = fs::read_to_string(abs_path)?;
-    let markdown = parse_md(read_result);
-    let length = markdown.len().to_string();
+    let md_parse_result = parse_md(read_result);
+    let html = format!(
+        "
+	<head>
+		<style>
+			{GLOBAL_STYLE}
+		</style>
+	</head>
+	<body>
+		<div class=\"container\">
+			{md_parse_result}
+		</div>
+	</body>
+	"
+    );
+    let length = html.len().to_string();
 
     let response = TextResponse {
         status: STATUS_OK.to_string(),
         headers: format!("Content-Length: {length}"),
-        body: markdown,
+        body: html,
     };
 
     return Ok(response);

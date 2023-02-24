@@ -1,7 +1,17 @@
-# Header One
-## Subheader
-### Subsubheader
-this is a test page
+# welcome to jack's custom webserver!
+## paragraph example
+this is a paragraph of text
+
+and this is another one
+
+## code block example
+
 ```
-this is some code
+if current_block == Block::Code{
+	parsed_block.push_str(fragment);
+	continue;
+}
 ```
+## list example
+- this is an unordered list
+- of several items
