@@ -1,13 +1,25 @@
+use crate::md_parser::parse_md;
+
+pub mod md_parser;
+
 use std::{
-    error,
-    fs::{self, File},
-    io::{BufRead, BufReader, Read, Write},
+    error, fmt, fs,
+    io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
     path::PathBuf,
 };
 
 // override result type
 type Result<T> = std::result::Result<T, Box<dyn error::Error>>;
+
+#[derive(Debug)]
+struct ResponseError(String);
+
+impl fmt::Display for ResponseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "HTTP response error: {}", self.0)
+    }
+}
 
 struct TextResponse {
     status: String,
@@ -34,7 +46,8 @@ impl FormatResponse for TextResponse {
     }
 }
 
-const SERVER_DIR: &str = "/home/jack/rust/webserver/src/";
+// The content directory to server -should end in '/'
+const SERVER_DIR: &str = "/home/jack/rust/webserver/src/pub/";
 const STATUS_OK: &str = "HTTP/1.1 200 OK ";
 const STATUS_NOT_FOUND: &str = "HTTP/1.1 404 Not Found ";
 
@@ -43,15 +56,25 @@ fn main() {
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        handle_connection(stream);
+        let conn_result = handle_connection(stream);
+        if conn_result.is_err() {
+            println!("Connection error.");
+        }
     }
 }
 
-fn handle_connection(mut stream: TcpStream) {
+fn handle_connection(mut stream: TcpStream) -> Result<()> {
     let buf_reader = BufReader::new(&mut stream);
 
+    // A response to send if the resource isn't found
+    let error_response = TextResponse {
+        status: STATUS_NOT_FOUND.to_string(),
+        headers: "".to_string(),
+        body: "404 // Requested resource not found".to_string(),
+    };
+
     // Split the request into parts and get the requested resource
-    let request = buf_reader.lines().next().unwrap().unwrap();
+    let request = buf_reader.lines().next().unwrap()?;
     let parts: Vec<_> = request.split(" ").collect();
     let resource = parts[1];
 
@@ -59,37 +82,34 @@ fn handle_connection(mut stream: TcpStream) {
 
     let response = match resolve_result {
         Ok(response) => response,
-        Err(_) => ("Resource not found!").as_bytes().to_vec(),
+        Err(_) => error_response.format_response(),
     };
 
-    stream.write_all(&response).unwrap();
+    stream.write_all(&response)?;
+    Ok(())
 }
 
+/**
+ * Takes a requested resource and tries to resolve it to something on the server
+ *
+ */
 fn resolve_response(requested_resource: &str) -> Result<Vec<u8>> {
-    let error_response = TextResponse {
-        status: STATUS_NOT_FOUND.to_string(),
-        headers: "".to_string(),
-        body: "404 // Requested resource not found".to_string(),
-    };
     let mut path = PathBuf::from(requested_resource);
-
     let has_extension = path.extension().is_some();
 
-    // If an extension has been provided, load that resource if available
+    // TODO - If a file extension has been provided, load that resource if available
     if has_extension {
-        return Ok(error_response.format_response());
+        return Err("Resource not found".into());
     }
+
+    // Automatically resolve the root to index
     if path.as_os_str() == "/" {
         path = PathBuf::from("/index");
     }
 
     path.set_extension("md");
-    let load_result = load_md(path);
-    let md_response = match load_result {
-        Ok(res) => res,
-        Err(_) => error_response,
-    };
 
+    let md_response = load_md(path)?;
     Ok(md_response.format_response())
 }
 
@@ -106,12 +126,13 @@ fn load_md(path: PathBuf) -> Result<TextResponse> {
     //let reader = BufReader::new(file);
 
     let read_result = fs::read_to_string(abs_path)?;
-    let length = String::from(read_result.len().to_string());
+    let markdown = parse_md(read_result);
+    let length = markdown.len().to_string();
 
     let response = TextResponse {
         status: STATUS_OK.to_string(),
         headers: format!("Content-Length: {length}"),
-        body: read_result,
+        body: markdown,
     };
 
     return Ok(response);
