@@ -15,3 +15,6 @@ if current_block == Block::Code{
 ## list example
 - this is an unordered list
 - of several items
+
+## image example
+!(/github.png)

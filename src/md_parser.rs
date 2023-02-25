@@ -1,9 +1,9 @@
-use std::str::Split;
+use std::{fmt::Debug, str::Split};
 
 /**
 * A basic markdown parser. Tries to parse md into html, and returns unchanged text for any failed fragments.
 */
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 enum Block {
     Root,
     Code,
@@ -84,6 +84,14 @@ fn parse_block(block: &str) -> String {
         parsed_block.push_str(&parse_line(fragment));
     }
 
+    // Close outstanding tags for the current block
+    if current_block == Block::List {
+        parsed_block.push_str("</ul>");
+    }
+    if current_block == Block::Code {
+        parsed_block.push_str("</div>");
+    }
+
     parsed_block
 }
 
@@ -92,13 +100,19 @@ fn parse_block(block: &str) -> String {
  *
  */
 fn parse_line(line: &str) -> String {
-    let index = 0;
+    let mut index = 0;
     let chars = line.chars().peekable();
     for char in chars {
-        // If the first character is #, render a header
-        if char == '#' && index == 0 {
-            return parse_header(line);
+        if index == 0 {
+            // If the first character is #, render a header
+            if char == '#' {
+                return parse_header(line);
+            }
+            if char == '!' {
+                return parse_image(line);
+            }
         }
+        index += 1;
     }
     let mut parsed_line = String::from("<p>");
     parsed_line.push_str(line);
@@ -132,6 +146,13 @@ fn parse_header(line: &str) -> String {
     return header;
 }
 
+fn parse_image(line: &str) -> String {
+    if line.len() < 3 {
+        return line.to_string();
+    }
+    let url = &line[2..line.len() - 1];
+    format!("<img src=\"{url}\"/>")
+}
 /**
  * Utility function for getting text after a bit of markdown syntax
  */

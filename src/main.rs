@@ -67,7 +67,7 @@ fn main() {
         let stream = stream.unwrap();
         let conn_result = handle_connection(stream);
         if conn_result.is_err() {
-            println!("Connection error.");
+            println!("Request not handled: {:?}", conn_result.err());
         }
     }
 }
@@ -88,7 +88,12 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
     let mut request = String::new();
     buf_reader.read_line(&mut request)?;
 
+    println!("{:#?}", request);
+
     let parts: Vec<_> = request.split(" ").collect();
+    if parts.len() < 2 {
+        return Err("Empty request.".into());
+    }
     let resource = parts[1];
 
     let resolve_result = resolve_response(resource);
@@ -133,8 +138,6 @@ fn resolve_response(requested_resource: &str) -> Result<Vec<u8>> {
 fn load_md_response(path: PathBuf) -> Result<HTTPResponse> {
     let mut abs_path = PathBuf::from(SERVER_DIR);
     abs_path.push(path.strip_prefix("/")?.to_path_buf());
-
-    println!("Requested {:#?}...", abs_path);
 
     let read_result = fs::read_to_string(abs_path)?;
     let md_parse_result = parse_md(read_result);
@@ -181,8 +184,6 @@ fn load_file_response(path: PathBuf) -> Result<HTTPResponse> {
 
     let mut abs_path = PathBuf::from(SERVER_DIR);
     abs_path.push(path.strip_prefix("/")?.to_path_buf());
-
-    println!("Requested {:#?}...", abs_path);
 
     let read_result = fs::read(abs_path)?;
     let length = read_result.len().to_string();

@@ -14,3 +14,4 @@ The server currently supports:
 - Sub-Subheaders
 - Code blocks
 - Unordered lists
+- Images
