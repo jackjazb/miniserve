@@ -2,7 +2,7 @@ use std::{
     error, fs,
     io::{BufRead, BufReader, Write},
     net::TcpStream,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use crate::{
@@ -24,15 +24,23 @@ pub fn handle_connection(mut stream: TcpStream, route_map: &RouteMap) -> Result<
     if parts.len() < 2 {
         return Err("Empty request.".into());
     }
-    let location = parts[1];
+    let path = parts[1];
+
+    if let Some(_) = Path::new(path).extension() {
+        if let Ok(res) = load_file_response(PathBuf::from(path)) {
+            let bytes: Vec<u8> = res.into();
+            stream.write_all(&bytes)?;
+            return Ok(());
+        }
+    }
 
     // Extract the referenced Route from the map, and render it if it exists
-    let rendered: Option<String> = router::parse_route(location, &route_map)
-        .and_then(|route| Some(renderer::render_route(&route, &location, &route_map)));
+    let rendered: Option<String> = router::parse_route(path, &route_map)
+        .and_then(|route| Some(renderer::render_route(&route, &path, &route_map)));
 
     let response: Vec<u8> = match rendered {
-        Some(body) => HTTPResponse::okay(Some(ContentType::HTML), &body),
-        None => HTTPResponse::not_found(None, "404 // Resource not found"),
+        Some(body) => HTTPResponse::okay(Some(ContentType::HTML), body.to_string().into_bytes()),
+        None => HTTPResponse::not_found(None, "404 // Resource not found".to_string().into_bytes()),
     }
     .into();
 
@@ -43,7 +51,6 @@ pub fn handle_connection(mut stream: TcpStream, route_map: &RouteMap) -> Result<
 // TODO
 fn load_file_response(path: PathBuf) -> Result<HTTPResponse> {
     let extension = path.extension();
-
     // Match different extensions for content type here
     let content_type = match extension {
         Some(os_str) => match os_str.to_str() {
@@ -57,10 +64,9 @@ fn load_file_response(path: PathBuf) -> Result<HTTPResponse> {
 
     let mut abs_path = PathBuf::from("./site");
     abs_path.push(path.strip_prefix("/")?.to_path_buf());
+    let read_result = fs::read(abs_path)?;
 
-    let read_result = fs::read_to_string(abs_path)?;
-
-    let res = HTTPResponse::new(Status::Ok, content_type, &read_result);
+    let res = HTTPResponse::okay(content_type, read_result);
 
     Ok(res)
 }

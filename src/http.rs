@@ -18,15 +18,15 @@ pub enum ContentType {
 }
 
 impl HTTPResponse {
-    pub fn okay(content_type: Option<ContentType>, body: &str) -> Self {
+    pub fn okay(content_type: Option<ContentType>, body: Vec<u8>) -> Self {
         Self::new(Status::Ok, content_type, body)
     }
 
-    pub fn not_found(content_type: Option<ContentType>, body: &str) -> Self {
+    pub fn not_found(content_type: Option<ContentType>, body: Vec<u8>) -> Self {
         Self::new(Status::NotFound, content_type, body)
     }
 
-    pub fn new(status: Status, content_type: Option<ContentType>, body: &str) -> Self {
+    pub fn new(status: Status, content_type: Option<ContentType>, body: Vec<u8>) -> Self {
         let status_string = match status {
             Status::Ok => HTTP_STATUS_200,
             Status::NotFound => HTTP_STATUS_404,
@@ -46,7 +46,7 @@ impl HTTPResponse {
             status,
             status_string,
             headers: format!("Content-Type: {content_type_string}\r\nContent-Length: {length}"),
-            body: body.to_string().into_bytes(),
+            body,
         }
     }
 }

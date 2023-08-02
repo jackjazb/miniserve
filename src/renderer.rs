@@ -1,6 +1,6 @@
 use crate::router::{Route, RouteMap};
 
-const GLOBAL_STYLE: &str = include_str!("style.css");
+const STYLE: &str = include_str!("style.css");
 
 pub fn render_route(route: &Route, location: &str, header_routes: &RouteMap) -> String {
     let body = render_body(route, location);
@@ -21,8 +21,9 @@ fn render_page(header_routes: &RouteMap, body: &str) -> String {
         "
 	<!DOCTYPE HTML>
 	<head>
+		<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />
 		<style>
-			{GLOBAL_STYLE}
+			{STYLE}
 		</style>
 	</head>
 	<body>
