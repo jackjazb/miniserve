@@ -7,19 +7,13 @@ use std::{
 
 use crate::{
     http::{ContentType, HTTPResponse, Status},
-    router,
-    site::Site,
+    renderer,
+    router::{self, RouteMap},
 };
 
 type Result<T> = std::result::Result<T, Box<dyn error::Error>>;
 
-const GLOBAL_STYLE: &str = "
-	body{
-		font-family:helvetica;
-	}
-";
-
-pub fn handle_connection(mut stream: TcpStream, site: &Site) -> Result<()> {
+pub fn handle_connection(mut stream: TcpStream, route_map: &RouteMap) -> Result<()> {
     let mut buf_reader = BufReader::new(&mut stream);
 
     // Split the request into parts and get the requested resource
@@ -30,12 +24,15 @@ pub fn handle_connection(mut stream: TcpStream, site: &Site) -> Result<()> {
     if parts.len() < 2 {
         return Err("Empty request.".into());
     }
-    let resource = parts[1];
-    let html = router::load_route(resource, &site.route_map);
+    let location = parts[1];
 
-    let response: Vec<u8> = match html {
-        Some(s) => HTTPResponse::new(Status::Ok, Some(ContentType::HTML), &wrap_html(&s)),
-        None => HTTPResponse::new(Status::NotFound, None, "404 // Resource not found"),
+    // Extract the referenced Route from the map, and render it if it exists
+    let rendered: Option<String> = router::parse_route(location, &route_map)
+        .and_then(|route| Some(renderer::render_route(&route, &location, &route_map)));
+
+    let response: Vec<u8> = match rendered {
+        Some(body) => HTTPResponse::okay(Some(ContentType::HTML), &body),
+        None => HTTPResponse::not_found(None, "404 // Resource not found"),
     }
     .into();
 
@@ -43,19 +40,7 @@ pub fn handle_connection(mut stream: TcpStream, site: &Site) -> Result<()> {
     Ok(())
 }
 
-fn wrap_html(html: &str) -> String {
-    format!(
-        "<head>
-		<style>
-			{GLOBAL_STYLE}
-		</style>
-	</head>
-	<body>
-		{html}
-	</body>"
-    )
-}
-
+// TODO
 fn load_file_response(path: PathBuf) -> Result<HTTPResponse> {
     let extension = path.extension();
 

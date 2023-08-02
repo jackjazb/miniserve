@@ -3,39 +3,42 @@ use std::collections::HashMap;
 // Maps strings (e.g. 'posts') to routes
 pub type RouteMap = HashMap<String, Route>;
 
-/// Represents a route.
-/// This can either be a page or a set of sub-routes
-#[derive(Debug)]
+/// Represents a resource on the webserver.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Route {
+    /// A single page, represented as an HTML string.
     Page(String),
-    SubRouteMap(RouteMap),
+    /// A directory, represented by a sub route map.
+    Directory(RouteMap),
 }
 
-/// Takes a slash delimited string and a RouteMap, and returns the route HTML defined in the map.
-/// Returns 'None' if the route does not exist.
-pub fn load_route(route: &str, route_map: &RouteMap) -> Option<String> {
+/// Takes a slash delimited route and a RouteMap, and parses the route.
+/// Returns the resource pointed to by the route if it exists, None if not.
+pub fn parse_route(route: &str, base_routes: &RouteMap) -> Option<Route> {
     // Any special redirects (eg / => /index) are defined here
     let route = match route {
         "/" => "/index",
         _ => route,
     };
-
     let mut split = route.split("/");
 
-    let mut current_route_map = route_map;
-
-    // Iterate over each part of the route, identifying
+    // Check each map and sub map for each segment of the route
+    let mut current_route_map = base_routes;
     while let Some(part) = split.next() {
-        if let Some(route) = current_route_map.get(part) {
-            match route {
-                Route::Page(html) => return Some(html.to_string()),
-                Route::SubRouteMap(route_map) => current_route_map = route_map,
-            }
+        if part == "" {
+            continue;
+        }
+        match current_route_map.get(part) {
+            Some(route) => match route {
+                Route::Page(_) => return Some(route.clone()),
+                Route::Directory(sub_routes) => current_route_map = sub_routes,
+            },
+            // If the key does not exist in the route map, return None
+            None => return None,
         }
     }
     // If we've run out of route components, render the last route map as a directory page
-
-    None
+    Some(Route::Directory(current_route_map.clone()))
 }
 
 #[cfg(test)]
@@ -52,7 +55,7 @@ mod tests {
 
         let route_map = HashMap::from([
             ("index".to_string(), Route::Page("index-html".to_string())),
-            ("sub-route".to_string(), Route::SubRouteMap(sub_route_map)),
+            ("sub-route".to_string(), Route::Directory(sub_route_map)),
         ]);
 
         route_map
@@ -61,28 +64,28 @@ mod tests {
     #[test]
     fn load_top_level_route() {
         let route_map = create_route_map();
-        let page = load_route("/index", &route_map);
-        assert_eq!(page, Some("index-html".to_string()));
+        let page = parse_route("/index", &route_map);
+        assert_eq!(page, Some(Route::Page("index-html".into())));
     }
 
     #[test]
     fn load_index() {
         let route_map = create_route_map();
-        let page = load_route("/", &route_map);
-        assert_eq!(page, Some("index-html".to_string()));
+        let page = parse_route("/", &route_map);
+        assert_eq!(page, Some(Route::Page("index-html".into())));
     }
 
     #[test]
     fn load_sub_route() {
         let route_map = create_route_map();
-        let page = load_route("/sub-route/sub-page", &route_map);
-        assert_eq!(page, Some("sub-page-html".to_string()));
+        let page = parse_route("/sub-route/sub-page", &route_map);
+        assert_eq!(page, Some(Route::Page("sub-page-html".into())));
     }
 
     #[test]
     fn load_dead_route() {
         let route_map = create_route_map();
-        let page = load_route("null", &route_map);
+        let page = parse_route("null", &route_map);
         assert_eq!(page, None);
     }
 }

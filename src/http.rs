@@ -1,4 +1,5 @@
-///
+const HTTP_STATUS_200: &str = "HTTP/1.1 200 OK ";
+const HTTP_STATUS_404: &str = "HTTP/1.1 404 Not Found ";
 pub struct HTTPResponse {
     status: Status,
     status_string: String,
@@ -17,10 +18,18 @@ pub enum ContentType {
 }
 
 impl HTTPResponse {
+    pub fn okay(content_type: Option<ContentType>, body: &str) -> Self {
+        Self::new(Status::Ok, content_type, body)
+    }
+
+    pub fn not_found(content_type: Option<ContentType>, body: &str) -> Self {
+        Self::new(Status::NotFound, content_type, body)
+    }
+
     pub fn new(status: Status, content_type: Option<ContentType>, body: &str) -> Self {
         let status_string = match status {
-            Status::Ok => "HTTP/1.1 200 OK ",
-            Status::NotFound => "HTTP/1.1 404 Not Found ",
+            Status::Ok => HTTP_STATUS_200,
+            Status::NotFound => HTTP_STATUS_404,
         }
         .to_string();
 
