@@ -1,7 +1,6 @@
 const HTTP_STATUS_200: &str = "HTTP/1.1 200 OK ";
 const HTTP_STATUS_404: &str = "HTTP/1.1 404 Not Found ";
 pub struct HTTPResponse {
-    status: Status,
     status_string: String,
     headers: String,
     body: Vec<u8>,
@@ -43,7 +42,6 @@ impl HTTPResponse {
         let length = body.len().to_string();
 
         HTTPResponse {
-            status,
             status_string,
             headers: format!("Content-Type: {content_type_string}\r\nContent-Length: {length}"),
             body,

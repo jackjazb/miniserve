@@ -14,6 +14,6 @@ Directories are rendered as lists of links.
 ## To Do
 
 - Add a site directory command line argument
-- Navbar
-- Styling in a separate file
-- `favicon.ico`
+- Config file with options
+- expand route structs with page titles etc
+- make sure nav link order is retained

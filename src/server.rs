@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    http::{ContentType, HTTPResponse, Status},
+    http::{ContentType, HTTPResponse},
     renderer,
     router::{self, RouteMap},
 };
