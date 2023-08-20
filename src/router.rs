@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
-// Maps strings (e.g. 'posts') to routes
-pub type RouteMap = HashMap<String, Route>;
+// Maps strings (e.g. 'posts') to routes. BTreeMap used to preserve key order.
+pub type RouteMap = BTreeMap<String, Route>;
 
 /// Represents a resource on the webserver.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,17 +43,17 @@ pub fn parse_route(route: &str, base_routes: &RouteMap) -> Option<Route> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     use super::*;
 
     fn create_route_map() -> RouteMap {
-        let sub_route_map = HashMap::from([(
+        let sub_route_map = BTreeMap::from([(
             "sub-page".to_string(),
             Route::Page("sub-page-html".to_string()),
         )]);
 
-        let route_map = HashMap::from([
+        let route_map = BTreeMap::from([
             ("index".to_string(), Route::Page("index-html".to_string())),
             ("sub-route".to_string(), Route::Directory(sub_route_map)),
         ]);
@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn load_dead_route() {
         let route_map = create_route_map();
-        let page = parse_route("null", &route_map);
+        let page = parse_route("nothing", &route_map);
         assert_eq!(page, None);
     }
 }

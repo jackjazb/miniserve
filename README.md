@@ -16,4 +16,4 @@ Directories are rendered as lists of links.
 - Add a site directory command line argument
 - Config file with options
 - expand route structs with page titles etc
-- make sure nav link order is retained
+- add dates to posts

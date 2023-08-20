@@ -2,11 +2,7 @@ body {
 	font: 1.2em sans-serif;
 	margin: 1em auto;
 	max-width: 40em;
-	padding: 0 0.62em
-}
-
-a {
-	padding-right: 0.5empx;
+	padding: 0 0.62em;
 }
 
 nav {
