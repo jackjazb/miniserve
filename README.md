@@ -4,16 +4,29 @@ This project aims to be a simple, very fast webserver that consumes markdown fil
 
 ## Usage
 
-- Place markdown files in a directory called `site` in the same directory as the server binary
-- Run the server
+```text
+$ miniserve ./markdown-dir
+Server started in 13.7624ms // Listening on port 8080
+```
 
-The program loads all the markdown from the site directory on startup, and exposes an HTTP server. The site structure mirrors the directory structure on disk - i.e. `./site/posts/first-post.md` would be accessible at `localhost/posts/first-post`.
+`miniserve` will look for a file called index.md to use as the site root; the server will fail to start
+if no such file exists.
 
-Directories are rendered as lists of links.
+## Options
+
+### `-p, --port`
+
+Overrides the default port (8080)
+
+### `-a, --address`
+
+Overrides the default address (127.0.0.1)
 
 ## To Do
 
-- Add a site directory command line argument
 - Config file with options
-- expand route structs with page titles etc
-- add dates to posts
+- Expand route structs with page titles etc.
+- Add dates to posts
+- Replace `String` key with `str` in route map
+- Cache images to avoid unecessary IO
+- Terminal colours

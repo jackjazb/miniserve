@@ -1,11 +1,15 @@
 # Setting Up Miniserve
 
-This is a quick guide on using `miniserve` to build your own static website. This page is a work in
-progress and will likely change lots as features are added!
+This is a quick guide on using `miniserve` to build your own static website.
 
 ## Setup
 
-- Create a folder called `site` in the same directory as the `miniserve` binary
-- Create an `index.md` file in the root of this directory - this will be served as the default route
-- Populate the folder with markdown files. Case in filenames is preserved, and underscores(`_`) are converted to spaces when rendered. You can organise your pages into folders, currently to a depth of one. The layout of the site mirrors that of the directory, with the top level items in the `site` directory comprising the navigation bar links
-- Run `miniserve`
+- Create a new directory containing an `index.md` file at the root - this will be served as the default route.
+- Put further markdown files in this directory. Directories can also be added - these will be added to the navbar.
+- Filenames should be formatted in sentence case, separated by underscores (e.g. `First_Post.md`).
+- Run miniserve as follows:
+
+```text
+$ miniserve ./you-directory-name
+Server started in 13.7624ms // Listening on port 8080
+```

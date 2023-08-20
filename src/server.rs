@@ -1,7 +1,7 @@
 use std::{
     collections::BTreeMap,
     error, fs,
-    io::{self, BufRead, BufReader, ErrorKind, Write},
+    io::{self, BufRead, BufReader, ErrorKind},
     net::TcpStream,
     ops::Add,
     path::{Path, PathBuf},
@@ -22,13 +22,17 @@ pub struct Server {
 impl Server {
     pub fn new(path: &str) -> Option<Self> {
         if let Ok(route_map) = load_routes_recursive(path) {
+            if !route_map.contains_key("index") {
+                println!("Could not find index.md in the specified directory");
+                return None;
+            }
             return Some(Server { route_map });
         }
         None
     }
 
     /// Reads an HTTP request from a TCP stream, and writes an HTTP response of some kind
-    pub fn handle_connection(&self, mut stream: TcpStream) -> Result<()> {
+    pub fn handle_connection(&self, mut stream: &TcpStream) -> Result<HTTPResponse> {
         let mut buf_reader = BufReader::new(&mut stream);
 
         // Split the request into parts and get the requested resource
@@ -42,29 +46,22 @@ impl Server {
         let path = parts[1];
 
         if let Some(_) = Path::new(path).extension() {
-            if let Ok(res) = Self::load_file_response(PathBuf::from(path)) {
-                let bytes: Vec<u8> = res.into();
-                stream.write_all(&bytes)?;
-                return Ok(());
-            }
+            return Self::load_file_response(PathBuf::from(path));
         }
 
         // Extract the referenced Route from the map, and render it if it exists
         let rendered: Option<String> = router::parse_route(path, &self.route_map)
             .and_then(|route| Some(renderer::render_route(&route, &path, &self.route_map)));
 
-        let response: Vec<u8> = match rendered {
+        let response = match rendered {
             Some(body) => {
                 HTTPResponse::okay(Some(ContentType::HTML), body.to_string().into_bytes())
             }
             None => {
                 HTTPResponse::not_found(None, "404 // Resource not found".to_string().into_bytes())
             }
-        }
-        .into();
-
-        stream.write_all(&response)?;
-        Ok(())
+        };
+        Ok(response)
     }
 
     /// Loads a file from disk and wraps it in an HTTPResponse
@@ -134,3 +131,6 @@ fn load_routes_recursive(path: &str) -> Result<RouteMap> {
 
     Ok(route_map)
 }
+
+#[cfg(test)]
+mod tests {}

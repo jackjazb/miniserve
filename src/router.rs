@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-// Maps strings (e.g. 'posts') to routes. BTreeMap used to preserve key order.
+/// Maps strings to routes. BTreeMap used to preserve key order.
 pub type RouteMap = BTreeMap<String, Route>;
 
 /// Represents a resource on the webserver.
@@ -8,7 +8,7 @@ pub type RouteMap = BTreeMap<String, Route>;
 pub enum Route {
     /// A single page, represented as an HTML string.
     Page(String),
-    /// A directory, represented by a sub route map.
+    /// A directory, represented by a nested route map.
     Directory(RouteMap),
 }
 
